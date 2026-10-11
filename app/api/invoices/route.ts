@@ -13,8 +13,10 @@ export async function POST(request: Request) {
     const amount = formatWei(amountToWei(body.amount));
     await assertMainnet();
     if (await rpc<string>('eth_getCode', [body.recipient, 'latest']) !== '0x') throw new Error('Use a standard receiving wallet. Smart-contract receiving wallets are not supported in this version.');
+    const head=BigInt(await rpc<string>('eth_blockNumber'));
+    const startBlock=(head > 2n ? head-2n : 0n).toString();
     const record = { id: crypto.randomUUID(), recipient: body.recipient.toLowerCase(), amount, note: body.note.trim(), createdAt: Date.now() };
-    const [invoice] = await getDb().insert(invoices).values({ ...record, data: await paymentData(record) }).returning();
+    const [invoice] = await getDb().insert(invoices).values({ ...record, data: await paymentData(record),startBlock }).returning();
     return Response.json({invoice}, {status:201, headers:{'Cache-Control':'no-store'}});
   } catch (e) { return Response.json({error:e instanceof Error ? e.message : 'Unable to create payment link.'}, {status:400}); }
 }

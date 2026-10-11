@@ -10,7 +10,7 @@ import { getMetaMaskClient } from '@/lib/metamask-client';
 declare global {interface Window {ethereum?:Provider}}
 async function api(path:string,body?:unknown) {
   const response=await fetch(path,body ? {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)} : {cache:'no-store'});
-  const result=await response.json() as {invoice:Invoice;transaction:Record<string,string>;maxFee:string;pending?:boolean;error?:string};
+  const result=await response.json() as {invoice:Invoice;transaction:Record<string,string>;maxFee:string;pending?:boolean;checking?:boolean;syncError?:boolean;error?:string};
   if (!response.ok) throw new Error(result.error || 'Something went wrong. Please try again.');
   return result;
 }
@@ -34,6 +34,8 @@ export default function Home() {
   const [qr,setQr]=useState('');
   const [pending,setPending]=useState('');
   const [recover,setRecover]=useState('');
+  const [checking,setChecking]=useState(true);
+  const [syncError,setSyncError]=useState(false);
   const paying=useRef(false);
   const paymentUrl=typeof window!=='undefined' && id ? `${window.location.origin}/?pay=${id}` : '';
 
@@ -54,7 +56,7 @@ export default function Home() {
     refreshMobileLink();
     window.addEventListener('ethereum#initialized',refreshMobileLink);
     const current=new URLSearchParams(window.location.search).get('pay') || '';
-    if(current) {if(!window.ethereum)void getMetaMaskClient().catch(()=>{});setId(current);setPending(safeStore('arcpay-pending-'+current)||'');api('/api/invoices/'+encodeURIComponent(current)).then(r=>setInvoice(r.invoice)).catch(e=>setError(errorText(e))).finally(()=>setLoading(false));}
+    if(current) {if(!window.ethereum)void getMetaMaskClient().catch(()=>{});setId(current);setPending(safeStore('arcpay-pending-'+current)||'');api('/api/invoices/'+encodeURIComponent(current)).then(r=>{setInvoice(r.invoice);setChecking(!!r.checking);setSyncError(!!r.syncError);}).catch(e=>setError(errorText(e))).finally(()=>setLoading(false));}
     else setLoading(false);
     return()=>{active=false;window.removeEventListener('ethereum#initialized',refreshMobileLink);provider?.removeListener?.('accountsChanged',onChange);};
   },[]);
@@ -70,9 +72,9 @@ export default function Home() {
     const poll=async()=>{
       try {
         const r=await api('/api/invoices/'+id);
-        if(active)setInvoice(r.invoice);
+        if(active){setInvoice(r.invoice);setChecking(!!r.checking);setSyncError(!!r.syncError);}
         if(pending && !r.invoice.txHash) await verify(pending);
-      }catch(e){if(active && pending)setError(errorText(e));}
+      }catch(e){if(active){setChecking(true);setSyncError(true);if(pending)setError(errorText(e));}}
     };
     const onReturn=()=>{if(document.visibilityState==='visible')void poll();};
     window.addEventListener('focus',onReturn);document.addEventListener('visibilitychange',onReturn);
@@ -95,10 +97,10 @@ export default function Home() {
   async function create(){await run('Creating link',async()=>{
     const recipient=await connect();if(!recipient)return;
     const r=await api('/api/invoices',{recipient,amount,note});
-    setInvoice(r.invoice);setId(r.invoice.id);setOwner(true);window.history.replaceState({},'',`/?pay=${r.invoice.id}`);
+    setInvoice(r.invoice);setChecking(false);setSyncError(false);setId(r.invoice.id);setOwner(true);window.history.replaceState({},'',`/?pay=${r.invoice.id}`);
   });}
   async function pay(){
-    if(paying.current || !invoice || invoice.txHash || pending)return;
+    if(paying.current || checking || !invoice || invoice.txHash || pending)return;
     const stored=safeStore('arcpay-pending-'+id);
     if(stored){setPending(stored);return;}
     paying.current=true;
@@ -112,7 +114,7 @@ export default function Home() {
       }
       setBusy('Preparing payment');
       const result=await submitInvoicePayment(provider,invoice,{
-        getInvoice:async()=> (await api('/api/invoices/'+id)).invoice,
+        getInvoice:async()=> {const r=await api('/api/invoices/'+id);setChecking(!!r.checking);setSyncError(!!r.syncError);if(r.checking&&!r.invoice.txHash)throw new Error('Checking Arc for an earlier payment. Please wait before paying.');return r.invoice;},
         prepare:async payer=> (await api(`/api/invoices/${id}/prepare`,{payer})).transaction,
         onAccount:setAccount,
         onReview:()=>setBusy('Confirm in MetaMask'),
@@ -142,9 +144,10 @@ export default function Home() {
             <div className={'status '+(paid?'paid':pending?'pending':'')}><span/>{paid?'PAID · VERIFIED ON ARC':pending?'TRANSACTION SUBMITTED':'AWAITING PAYMENT'}</div>
             <div className="requested-amount">{invoice.amount}<span>USDC</span></div><p className="payment-note">{invoice.note||'USDC payment'}</p>
             <div className="details"><div><span>Receiving wallet</span><a href={`${EXPLORER}/address/${invoice.recipient}`} target="_blank" rel="noreferrer" className="mono">{short(invoice.recipient)} <ExternalLink size={12}/></a></div><div><span>Network</span><b>Arc mainnet</b></div><div><span>Platform fee</span><b>0 USDC</b></div></div>
-            {paid?<><div className="success-note"><ShieldCheck size={20}/><span>Amount, recipient, payment reference, and successful transaction verified.</span></div><div className="receipt-details"><label>Transaction hash</label><a className="hash" href={`${EXPLORER}/tx/${invoice.txHash}`} target="_blank" rel="noreferrer">{invoice.txHash}<ExternalLink size={14}/></a><div><span>From</span><code>{invoice.payer}</code></div><div><span>Block</span><b>{invoice.blockNumber}</b></div><div><span>Confirmed</span><b>{invoice.paidAt?new Date(invoice.paidAt).toLocaleString():''}</b></div><div><span>Network fee</span><b>{invoice.fee?formatWei(invoice.fee):'0'} USDC</b></div></div><button className="button primary-button" disabled={!!busy} onClick={()=>run('Verifying receipt',async()=>{await verify(invoice.txHash!);})}><ShieldCheck size={18}/>{busy||'Verify receipt again'}<ArrowRight size={18}/></button></>:owner?<div className="owner-note"><LoaderCircle size={18} className="spin"/><span>This page updates automatically when your payer completes payment.</span></div>:pending?<div className="pending-box"><LoaderCircle className="spin" size={22}/><h3>Confirming your payment</h3><p>Keep this page open. Please don’t pay again while this transaction is pending.</p><a href={`${EXPLORER}/tx/${pending}`} target="_blank" rel="noreferrer">View transaction <ExternalLink size={13}/></a><button className="text-button" onClick={()=>run('Checking transaction',async()=>{await verify(pending);})}>Check again</button></div>:<>
-              <button className="button primary-button" disabled={!!busy} onClick={()=>void pay()}>{busy?<LoaderCircle className="spin" size={18}/>:<Wallet size={18}/>} {busy||'Pay with MetaMask'} {!busy&&<ArrowRight size={18}/>}</button><p className="under-button">Review {invoice.amount} USDC and the network fee in MetaMask. You approve the payment there.</p>
+            {paid?<><div className="success-note"><ShieldCheck size={20}/><span>Amount, recipient, payment reference, and successful transaction verified.</span></div><div className="receipt-details"><label>Transaction hash</label><a className="hash" href={`${EXPLORER}/tx/${invoice.txHash}`} target="_blank" rel="noreferrer">{invoice.txHash}<ExternalLink size={14}/></a><div><span>From</span><code>{invoice.payer}</code></div><div><span>To</span><code>{invoice.recipient}</code></div><div><span>Block</span><b>{invoice.blockNumber}</b></div><div><span>Confirmed</span><b>{invoice.paidAt?new Date(invoice.paidAt).toLocaleString():''}</b></div><div><span>Network fee</span><b>{invoice.fee?formatWei(invoice.fee):'0'} USDC</b></div></div><button className="button primary-button" disabled={!!busy} onClick={()=>run('Verifying receipt',async()=>{await verify(invoice.txHash!);})}><ShieldCheck size={18}/>{busy||'Verify receipt again'}<ArrowRight size={18}/></button></>:owner?<div className="owner-note"><LoaderCircle size={18} className="spin"/><span>This page updates automatically when your payer completes payment.</span></div>:pending?<div className="pending-box"><LoaderCircle className="spin" size={22}/><h3>Confirming your payment</h3><p>Keep this page open. Please don’t pay again while this transaction is pending.</p><a href={`${EXPLORER}/tx/${pending}`} target="_blank" rel="noreferrer">View transaction <ExternalLink size={13}/></a><button className="text-button" onClick={()=>run('Checking transaction',async()=>{await verify(pending);})}>Check again</button></div>:<>
+              <button className="button primary-button" disabled={!!busy||checking} onClick={()=>void pay()}>{busy?<LoaderCircle className="spin" size={18}/>:<Wallet size={18}/>} {busy||(checking?'Checking Arc for payment…':'Pay with MetaMask')} {!busy&&<ArrowRight size={18}/>}</button><p className="under-button">Review {invoice.amount} USDC and the network fee in MetaMask. You approve the payment there.</p>
             </>}
+            {!paid&&syncError&&<p role="status">Arc verification is temporarily unavailable. We’ll keep checking. Please check wallet activity before trying another payment.</p>}
             {!paid&&<details className="recovery"><summary>Already sent a transaction?</summary><p>Paste its hash to verify it. Only a transaction made for this exact link can be accepted. If your wallet replaced the transaction, use the new hash.</p><input aria-label="Transaction hash" className="text-input" placeholder="0x… transaction hash" value={recover} onChange={e=>setRecover(e.target.value)}/><button className="button secondary-button" disabled={!!busy||!recover} onClick={()=>run('Verifying transaction',async()=>{const r=await verify(recover);if(r.pending)setInfo('Not confirmed yet. Check its status in your wallet or explorer before retrying.');})}>Verify transaction</button>{pending&&<button className="text-button" onClick={()=>{if(window.confirm('Only reset after the explorer or wallet confirms this transaction failed, was cancelled, or was dropped. A pending transaction may still complete. Have you checked?')){clearStored('arcpay-pending-'+id);setPending('');setError('');}}}>Reset a failed or cancelled attempt</button>}</details>}
           </>:<div className="loading"><ReceiptText/><p>This payment link is unavailable.</p><a href="/">Create a new link</a></div>}
           {error&&<div className="message error" role="alert">{error}</div>}{info&&<div className="message info" role="status">{info}</div>}

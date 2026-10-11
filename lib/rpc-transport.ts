@@ -7,6 +7,7 @@ export async function readArcRpc<T>(
   endpoints: readonly string[],
   chainId: number,
   fetcher: typeof fetch = fetch,
+  verifiedEndpoints = new Set<string>(),
 ): Promise<T> {
   const read = async (endpoint: string, rpcMethod: string, rpcParams: unknown[]): Promise<unknown> => {
     const response = await fetcher(endpoint, {
@@ -29,11 +30,12 @@ export async function readArcRpc<T>(
   for (const endpoint of endpoints) {
     try {
       // Check the chain on the same endpoint used for the requested read.
-      const chain = await read(endpoint, 'eth_chainId', []);
+      const chain = method === 'eth_chainId' || !verifiedEndpoints.has(endpoint) ? await read(endpoint, 'eth_chainId', []) : '0x' + chainId.toString(16);
       if (typeof chain !== 'string' || BigInt(chain) !== BigInt(chainId)) {
         console.error('Arc RPC chain mismatch', { endpoint });
         continue;
       }
+      verifiedEndpoints.add(endpoint);
       return (method === 'eth_chainId' ? chain : await read(endpoint, method, params)) as T;
     } catch (error) {
       if (error instanceof ArcRpcRequestError) throw error;

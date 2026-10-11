@@ -8,7 +8,9 @@ ArcPay Link is a small, non-custodial USDC payment-link app for Arc mainnet. A r
 
 **Public source:** https://github.com/shahrukhinfinitesoft-netizen/arcpay-link
 
-**Mainnet payment test: pending.** The app is deployed and backend checks pass, but no wallet-approved USDC transfer has been completed or claimed. The transaction hash and receipt will be added after that test.
+**Real mainnet transfer verified:** 1 USDC, 11 October 2026, block 25436306. [Transaction](https://explorer.arc.io/tx/0x22e9bc8cd230ca45b87ea5b499c6c60c214e1dede88cc965da879a066bc85f6f), [receipt](https://arcpay-link.faircalf64.chatgpt.site/?pay=2a4a0181-1a67-4ce6-a642-c4b941994178).
+
+Sender: `0xff4a2ff3d350ad0b13de2e736ee353748817edcc`. Recipient: `0x302fc334b6125af4025bc1fdfea409d1b975e0c0`. Successful receipt, exact amount/reference and canonical block were independently checked against Arc RPCs. The original mobile test required manually supplying the hash after a broken wallet handoff. Automatic discovery is now implemented; a full mobile retest remains pending. MetaMask's harmful-site warning is unresolved. **Not ready for submission.**
 
 ## What is included
 
@@ -91,7 +93,7 @@ The app deliberately refuses self-payments; use two wallet addresses you control
 - Share one request with one payer. Without a settlement contract, simultaneous payments from separate browser sessions cannot be prevented atomically. A second transfer can occur before either session sees the first receipt; the app records the first verified payment and does not issue automatic refunds.
 - Normal retries on the same browser preserve the submitted hash and disable the pay button. A dropped/cancelled transaction must be checked in the wallet or explorer before resetting the attempt.
 - A transaction sent outside this app without the exact reference cannot settle its invoice.
-- Closing the payer browser immediately after submission may require reopening it or entering the transaction hash. There is no background chain indexer.
+- Open invoice pages trigger bounded server scans of native USDC Transfer logs, using persisted block checkpoints. Matching transactions undergo full receipt/reference verification before PAID. Scans resume every seven seconds while a page is open; there is no always-running indexer. Hash recovery remains available.
 - Public links expose the amount, note, wallet addresses and receipt details. Do not include private information in notes. Receiving-wallet ownership is not authenticated by a signature; a link is not proof of a merchant's identity.
 - There is no account, invoice listing, cancellation, automatic expiry, refund flow, fiat conversion, bridge or WalletConnect integration.
 - Public RPC reliability and hosting availability are dependencies. A missing/failed receipt never counts as payment.
@@ -102,7 +104,7 @@ The app deliberately refuses self-payments; use two wallet addresses you control
 - Official Arc/Circle network, USDC and grant documentation checked on 11 October 2026.
 - Official RPC `eth_chainId` returned `0x13b2` (5042).
 - Unit tests cover decimal precision, invalid input, reference binding, mismatched transactions, replay across links, self-payment and failed/inconsistent receipts.
-- Mainnet end-to-end payment requires the builder's wallet approval. Record its evidence before submitting.
+- A real 1 USDC mainnet payment is recorded above. The complete automatic mobile flow still needs a retest after the security warning is resolved.
 
 ## Official references
 
@@ -124,7 +126,7 @@ Payers open an ordinary payment URL or QR, review amount, note and recipient, an
 
 Injected wallet connections read `eth_accounts` and request `eth_requestAccounts` only when necessary. For mobile relay connections, MetaMask Connect manages the wallet session internally as part of Pay; its EVM client includes Ethereum mainnet as a bootstrap permission alongside requested Arc, as documented by MetaMask. Arc switching uses `eth_chainId`, `wallet_switchEthereumChain`, and `wallet_addEthereumChain` only when needed. First-time wallet access and network prompts may still appear. Only the explicit Pay action requests a transaction. Account, chain, recipient, exact amount and invoice reference are checked before sending. No token approvals, permits, message signatures, seed phrases, or private keys are requested. SDK analytics are disabled. Creating a link does not send a transaction.
 
-**Verification pending:** the earlier reported MetaMask security warning is unresolved. Code review found none of the approval/signature calls above, but cannot establish the warning's cause or clear a wallet vendor's classification. Actual phone deep-link behavior and a real mainnet transfer still require device testing. Do not bypass a security warning to test this app.
+**Verification pending:** the earlier reported MetaMask security warning is unresolved. Code review found none of the approval/signature calls above, but cannot establish the warning's cause or clear a wallet vendor's classification. The real transfer is verified, but the repaired automatic status flow and mobile handoff still require device testing. Do not bypass a security warning to test this app.
 
 RPC reads use the official primary mainnet endpoint and the official dRPC mainnet endpoint as a fallback. Each endpoint must return chain ID 5042 before its data is used. Failover never broadcasts transactions; the wallet remains responsible for the single explicit payment submission. Failed reads log only the endpoint, method, and transport error for diagnosis.
 
@@ -133,3 +135,5 @@ QR codes and copied links both open the ordinary payment page so details are vis
 Payment preparation checks the native Arc USDC balance before gas estimation. Insufficient-funds RPC errors are reported as funding errors, rather than mislabeled network outages. USDC on other chains cannot pay an Arc invoice.
 
 MetaMask integration references: [EVM quickstart](https://docs.metamask.io/metamask-connect/evm/quickstart/javascript/) and [EVM methods](https://docs.metamask.io/metamask-connect/evm/reference/methods/). No Infura API key is needed because the app supplies its Arc RPC URL.
+
+Automatic discovery uses Arc native USDC Transfer events from `0xfffffffffffffffffffffffffffffffffffffffe` with 18-decimal values, recipient topics and a maximum 1,000-block range per scan. See [official indexing documentation](https://docs.arc.io/integrate/infrastructure/indexing-events). Matching amount alone cannot settle a request: its unique input reference and successful canonical receipt must also match.
