@@ -13,7 +13,7 @@ ArcPay Link is a small, non-custodial USDC payment-link app for Arc mainnet. A r
 ## What is included
 
 - Amount + short note → persistent payment link and locally generated QR code.
-- Browser-wallet connection (EIP-1193; MetaMask desktop or mobile wallet browser).
+- One payer action: **Pay with MetaMask**, using the desktop extension, MetaMask browser, or the official mobile relay connection.
 - Arc mainnet network selection and native USDC payment.
 - Exact integer amount handling; up to six decimal places in requests.
 - Shared payment status stored in Cloudflare D1; polling every seven seconds.
@@ -76,7 +76,7 @@ Local data is separate from production. `pnpm db:generate` creates a migration a
 ## Small mainnet acceptance test
 
 1. Open the live app using a standard receiving wallet (wallet A).
-2. Create a link for **0.01 USDC**, note `ArcPay Link mainnet acceptance test`.
+2. Create a link for **0.10 USDC**, note `ArcPay Link mainnet acceptance test`.
 3. Open the link in another browser or wallet session, using wallet B with enough Arc mainnet USDC for the amount and network fee.
 4. Review recipient, amount and network. Approve the payment in wallet B yourself.
 5. Verify that both views change to PAID. Open the explorer link and reverify the receipt.
@@ -120,14 +120,16 @@ MIT. Independent project; not an official Circle or Arc product.
 
 ### Wallet connection and security
 
-On mobile browsers without an injected wallet, Connect Wallet opens the same payment URL in MetaMask Mobile through its official dapp universal link. Desktop MetaMask extension support is unchanged. Compatible injected EIP-1193 wallets also work; there is no WalletConnect integration.
+Payers open an ordinary payment URL or QR, review amount, note and recipient, and tap **Pay with MetaMask**. That one action handles account access, Arc switching, backend preparation and `eth_sendTransaction`; there is no separate Connect or in-app Review button. MetaMask is the final review and approval surface. Normal mobile browsers use the official `@metamask/connect-evm` relay so the request remains in the original browser. The desktop extension and MetaMask in-app browser use their injected provider. Creators can still connect their receiving wallet before creating a request.
 
-Connection first reads `eth_accounts`, then requests `eth_requestAccounts` only when necessary. Arc switching uses `eth_chainId`, `wallet_switchEthereumChain`, and `wallet_addEthereumChain` only when needed. Only the explicit Pay button invokes `eth_sendTransaction` for the reviewed invoice. No token approvals, permits, message signatures, seed phrases, or private keys are requested. Creating a link does not send a transaction.
+Injected wallet connections read `eth_accounts` and request `eth_requestAccounts` only when necessary. For mobile relay connections, MetaMask Connect manages the wallet session internally as part of Pay; its EVM client includes Ethereum mainnet as a bootstrap permission alongside requested Arc, as documented by MetaMask. Arc switching uses `eth_chainId`, `wallet_switchEthereumChain`, and `wallet_addEthereumChain` only when needed. First-time wallet access and network prompts may still appear. Only the explicit Pay action requests a transaction. Account, chain, recipient, exact amount and invoice reference are checked before sending. No token approvals, permits, message signatures, seed phrases, or private keys are requested. SDK analytics are disabled. Creating a link does not send a transaction.
 
 **Verification pending:** the earlier reported MetaMask security warning is unresolved. Code review found none of the approval/signature calls above, but cannot establish the warning's cause or clear a wallet vendor's classification. Actual phone deep-link behavior and a real mainnet transfer still require device testing. Do not bypass a security warning to test this app.
 
 RPC reads use the official primary mainnet endpoint and the official dRPC mainnet endpoint as a fallback. Each endpoint must return chain ID 5042 before its data is used. Failover never broadcasts transactions; the wallet remains responsible for the single explicit payment submission. Failed reads log only the endpoint, method, and transport error for diagnosis.
 
-Unpaid QR codes open the payment request directly in MetaMask Mobile; copied links remain ordinary web URLs, and paid receipt QR codes remain ordinary web links. The app restores already-authorized accounts on load with `eth_accounts` and handles late wallet-provider injection. Opening the app, granting first-time account access, and approving a payment remain separate wallet-controlled actions.
+QR codes and copied links both open the ordinary payment page so details are visible before any wallet action. No payment is triggered by opening a URL. The app restores existing injected-wallet access with `eth_accounts` and handles late provider injection. Returning from MetaMask refreshes payment status; the submitted hash is persisted before independent backend verification. A cancelled wallet request is never automatically retried.
 
 Payment preparation checks the native Arc USDC balance before gas estimation. Insufficient-funds RPC errors are reported as funding errors, rather than mislabeled network outages. USDC on other chains cannot pay an Arc invoice.
+
+MetaMask integration references: [EVM quickstart](https://docs.metamask.io/metamask-connect/evm/quickstart/javascript/) and [EVM methods](https://docs.metamask.io/metamask-connect/evm/reference/methods/). No Infura API key is needed because the app supplies its Arc RPC URL.
