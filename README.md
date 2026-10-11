@@ -117,3 +117,11 @@ The app deliberately refuses self-payments; use two wallet addresses you control
 ## License
 
 MIT. Independent project; not an official Circle or Arc product.
+
+### Wallet connection and security
+
+On mobile browsers without an injected wallet, Connect Wallet opens the same payment URL in MetaMask Mobile through its official dapp universal link. Desktop MetaMask extension support is unchanged. Compatible injected EIP-1193 wallets also work; there is no WalletConnect integration.
+
+Connection first reads `eth_accounts`, then requests `eth_requestAccounts` only when necessary. Arc switching uses `eth_chainId`, `wallet_switchEthereumChain`, and `wallet_addEthereumChain` only when needed. Only the explicit Pay button invokes `eth_sendTransaction` for the reviewed invoice. No token approvals, permits, message signatures, seed phrases, or private keys are requested. Creating a link does not send a transaction.
+
+**Verification pending:** the earlier reported MetaMask security warning is unresolved. Code review found none of the approval/signature calls above, but cannot establish the warning's cause or clear a wallet vendor's classification. Actual phone deep-link behavior and a real mainnet transfer still require device testing. Do not bypass a security warning to test this app.
