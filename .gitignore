@@ -57,3 +57,6 @@ next-env.d.ts
 *.tsbuildinfo
 
 /upload/
+
+/vercel-app/.next/
+/vercel-app/node_modules/

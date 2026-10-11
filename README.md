@@ -137,3 +137,7 @@ Payment preparation checks the native Arc USDC balance before gas estimation. In
 MetaMask integration references: [EVM quickstart](https://docs.metamask.io/metamask-connect/evm/quickstart/javascript/) and [EVM methods](https://docs.metamask.io/metamask-connect/evm/reference/methods/). No Infura API key is needed because the app supplies its Arc RPC URL.
 
 Automatic discovery uses Arc native USDC Transfer events from `0xfffffffffffffffffffffffffffffffffffffffe` with 18-decimal values, recipient topics and a maximum 1,000-block range per scan. See [official indexing documentation](https://docs.arc.io/integrate/infrastructure/indexing-events). Matching amount alone cannot settle a request: its unique input reference and successful canonical receipt must also match.
+
+## Vercel hosting comparison
+
+A Next.js entry point in [`vercel-app`](vercel-app/README.md) serves this same interface while retaining the existing invoice API and D1 database. It preserves existing payment requests and receipts. Vercel deployment is pending project-creation authorization; no Vercel URL or warning-free result is claimed.
