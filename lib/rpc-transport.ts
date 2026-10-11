@@ -1,3 +1,5 @@
+export class ArcRpcRequestError extends Error {}
+
 // Read-only failover. No transaction is submitted or retried by this transport.
 export async function readArcRpc<T>(
   method: string,
@@ -13,8 +15,15 @@ export async function readArcRpc<T>(
       signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const result = await response.json() as { result?: unknown; error?: unknown };
-    if (result.error || result.result === undefined) throw new Error('Invalid RPC response');
+    const result = await response.json() as { result?: unknown; error?: {code?: number; message?: string} };
+    if (result.error) {
+      const message = result.error.message || '';
+      if (/OutOfFunds|insufficient funds/i.test(message)) {
+        throw new ArcRpcRequestError('Not enough USDC on Arc mainnet. USDC on Solana or another network cannot pay this request.');
+      }
+      throw new ArcRpcRequestError(`Arc rejected this request (RPC error ${result.error.code ?? 'unknown'}).`);
+    }
+    if (result.result === undefined) throw new Error('Invalid RPC response');
     return result.result;
   };
   for (const endpoint of endpoints) {
@@ -27,6 +36,7 @@ export async function readArcRpc<T>(
       }
       return (method === 'eth_chainId' ? chain : await read(endpoint, method, params)) as T;
     } catch (error) {
+      if (error instanceof ArcRpcRequestError) throw error;
       // No account addresses, notes, request bodies, tokens, or response bodies logged.
       console.warn('Arc RPC read failed', { endpoint, method, reason: error instanceof Error ? error.message : 'Fetch failed' });
     }

@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {amountToWei,formatWei,paymentData,validateTransaction,validateReceipt,type Invoice,type RpcTransaction,type RpcReceipt} from '../lib/payment.ts';
+import {assertPaymentBalance,amountToWei,formatWei,paymentData,validateTransaction,validateReceipt,type Invoice,type RpcTransaction,type RpcReceipt} from '../lib/payment.ts';
 const hash='0x'+'a'.repeat(64),blockHash='0x'+'b'.repeat(64);
 const invoice:Invoice={id:'invoice-one',recipient:'0x'+'1'.repeat(40),amount:'1.25',note:'Design work',createdAt:0,data:'0x1234',txHash:null,payer:null,blockNumber:null,paidAt:null,fee:null};
 const tx:RpcTransaction={hash,from:'0x'+'2'.repeat(40),to:invoice.recipient,value:'0x'+amountToWei('1.25').toString(16),input:invoice.data,blockHash,blockNumber:'0x100',chainId:'0x13b2'};
@@ -11,3 +11,10 @@ test('reference commits to amount, recipient, note and unique invoice ID',async(
 test('accepts exactly matching mainnet payment',()=>{assert.doesNotThrow(()=>validateTransaction(invoice,hash,tx));assert.doesNotThrow(()=>validateReceipt(hash,tx,receipt));});
 test('rejects wrong recipient, amount, reference, network, hash and self-payment',()=>{for(const change of [{to:'0x'+'3'.repeat(40)},{value:'0x1'},{input:'0xabcd'},{chainId:'0x1'},{hash:'0x'+'c'.repeat(64)},{from:invoice.recipient}])assert.throws(()=>validateTransaction(invoice,hash,{...tx,...change}));});
 test('failed, mismatched and unmined transactions cannot produce a paid receipt',()=>{for(const change of [{status:'0x0'},{transactionHash:'0x'+'d'.repeat(64)},{blockHash:'0x'+'e'.repeat(64)},{blockNumber:'0x101'},{from:invoice.recipient},{to:tx.from}])assert.throws(()=>validateReceipt(hash,tx,{...receipt,...change}));assert.throws(()=>validateReceipt(hash,{...tx,blockHash:null},receipt));});
+
+test('requires native Arc payment balance and reserves the network fee',()=>{
+  const value=amountToWei('0.1'),fee=1000000000000000n;
+  assert.throws(()=>assertPaymentBalance(0n,value),/Not enough USDC on Arc mainnet/);
+  assert.throws(()=>assertPaymentBalance(value,value,fee),/network fee/);
+  assert.doesNotThrow(()=>assertPaymentBalance(value+fee,value,fee));
+});

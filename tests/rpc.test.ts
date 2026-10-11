@@ -20,6 +20,16 @@ test('a responding testnet endpoint cannot supply mainnet payment data', async (
   assert.deepEqual(calls,['eth_chainId']);
 });
 test('timeouts and malformed responses fail closed without inventing results', async () => {
-  const mock = (async (url) => { if(url === 'timeout') throw new Error('timeout'); return Response.json({error:{code:-32000}}); }) as typeof fetch;
+  const mock = (async (url) => { if(url === 'timeout') throw new Error('timeout'); return Response.json({jsonrpc:"2.0",id:1}); }) as typeof fetch;
   await assert.rejects(readArcRpc('eth_chainId',[],['timeout','invalid'],5042,mock), /Unable to reach Arc mainnet/);
+});
+
+test('insufficient-funds RPC rejection is reported as a balance issue, not an outage', async () => {
+  const calls: string[] = [];
+  const mock = (async (url, init) => {
+    const {method} = JSON.parse(init!.body as string); calls.push(`${url}:${method}`);
+    return method === 'eth_chainId' ? reply('0x13b2') : Response.json({error:{code:-32003,message:'revert: OutOfFunds'}});
+  }) as typeof fetch;
+  await assert.rejects(readArcRpc('eth_estimateGas',[],['primary','fallback'],5042,mock), /Not enough USDC on Arc mainnet/);
+  assert.deepEqual(calls,['primary:eth_chainId','primary:eth_estimateGas']);
 });

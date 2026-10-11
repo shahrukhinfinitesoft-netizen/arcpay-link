@@ -40,3 +40,7 @@ export function validateReceipt(hash: string, tx: RpcTransaction, receipt: RpcRe
   if (receipt.status !== '0x1') throw new Error('Transaction failed on-chain. No payment has been recorded.');
   if (receipt.transactionHash.toLowerCase() !== hash.toLowerCase() || !tx.blockHash || receipt.blockHash !== tx.blockHash || receipt.blockNumber !== tx.blockNumber || receipt.to?.toLowerCase() !== tx.to?.toLowerCase() || receipt.from.toLowerCase() !== tx.from.toLowerCase()) throw new Error('Transaction receipt could not be verified.');
 }
+
+export function assertPaymentBalance(balance: bigint, value: bigint, fee = 0n) {
+  if (balance < value + fee) throw new Error('Not enough USDC on Arc mainnet. Add the payment amount plus the network fee. USDC on Solana or another network cannot pay this request.');
+}

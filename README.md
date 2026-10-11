@@ -127,3 +127,7 @@ Connection first reads `eth_accounts`, then requests `eth_requestAccounts` only 
 **Verification pending:** the earlier reported MetaMask security warning is unresolved. Code review found none of the approval/signature calls above, but cannot establish the warning's cause or clear a wallet vendor's classification. Actual phone deep-link behavior and a real mainnet transfer still require device testing. Do not bypass a security warning to test this app.
 
 RPC reads use the official primary mainnet endpoint and the official dRPC mainnet endpoint as a fallback. Each endpoint must return chain ID 5042 before its data is used. Failover never broadcasts transactions; the wallet remains responsible for the single explicit payment submission. Failed reads log only the endpoint, method, and transport error for diagnosis.
+
+Unpaid QR codes open the payment request directly in MetaMask Mobile; copied links remain ordinary web URLs, and paid receipt QR codes remain ordinary web links. The app restores already-authorized accounts on load with `eth_accounts` and handles late wallet-provider injection. Opening the app, granting first-time account access, and approving a payment remain separate wallet-controlled actions.
+
+Payment preparation checks the native Arc USDC balance before gas estimation. Insufficient-funds RPC errors are reported as funding errors, rather than mislabeled network outages. USDC on other chains cannot pay an Arc invoice.
