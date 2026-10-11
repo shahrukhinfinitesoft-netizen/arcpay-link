@@ -4,7 +4,7 @@ This deployment serves the existing ArcPay Link interface on Next.js. The page, 
 
 ## Vercel project settings
 
-- Project name: `arpacy` (requested; availability is determined by Vercel).
+- Live deployment: https://arcpay-link-xi39.vercel.app.
 - GitHub repository: `shahrukhinfinitesoft-netizen/arcpay-link`, branch `main`.
 - Framework: Next.js.
 - Root directory: `vercel-app`.
@@ -29,4 +29,4 @@ node ../node_modules/next/dist/bin/next start
 
 This uses the production invoice API and database. Do not submit test transactions or create requests inadvertently. A new hosting domain does not establish security or resolve MetaMask's classification of the original site. Any wallet warning must still be investigated; do not bypass it.
 
-Validation: Next.js 16.3.4 production build and local homepage check passed. The external invoice rewrite appears in the build routing manifest. Local live API proxy verification was blocked by the execution workspace DNS restrictions; it must pass on the actual Vercel deployment before release is claimed.
+Validation: Next.js 16.3.4 production build and local homepage check passed. The external invoice rewrite appears in the build routing manifest. Local live API proxy verification was blocked by the execution workspace DNS restrictions. The actual Vercel homepage and paid-receipt API subsequently passed HTTP checks, and the real 1 USDC receipt matched its recorded hash, sender, recipient and block. This is a read-only receipt check, not a new end-to-end wallet payment test.

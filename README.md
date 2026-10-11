@@ -4,11 +4,13 @@ A link. A payment. A verifiable receipt.
 
 ArcPay Link is a small, non-custodial USDC payment-link app for Arc mainnet. A requester connects a receiving wallet, enters an amount and optional note, and shares a link or QR code. The payer reviews the amount, recipient and USDC network fee in their wallet. A server verifies the successful on-chain transaction before marking the shared record **PAID**.
 
-**Live app:** https://arcpay-link.faircalf64.chatgpt.site
+**Live app:** https://arcpay-link-xi39.vercel.app
+
+**Original Worker deployment / invoice API:** https://arcpay-link.faircalf64.chatgpt.site
 
 **Public source:** https://github.com/shahrukhinfinitesoft-netizen/arcpay-link
 
-**Real mainnet transfer verified:** 1 USDC, 11 October 2026, block 25436306. [Transaction](https://explorer.arc.io/tx/0x22e9bc8cd230ca45b87ea5b499c6c60c214e1dede88cc965da879a066bc85f6f), [receipt](https://arcpay-link.faircalf64.chatgpt.site/?pay=2a4a0181-1a67-4ce6-a642-c4b941994178).
+**Real mainnet transfer verified:** 1 USDC, 11 October 2026, block 25436306. [Transaction](https://explorer.arc.io/tx/0x22e9bc8cd230ca45b87ea5b499c6c60c214e1dede88cc965da879a066bc85f6f), [receipt](https://arcpay-link-xi39.vercel.app/?pay=2a4a0181-1a67-4ce6-a642-c4b941994178).
 
 Sender: `0xff4a2ff3d350ad0b13de2e736ee353748817edcc`. Recipient: `0x302fc334b6125af4025bc1fdfea409d1b975e0c0`. Successful receipt, exact amount/reference and canonical block were independently checked against Arc RPCs. The original mobile test required manually supplying the hash after a broken wallet handoff. Automatic discovery is now implemented; a full mobile retest remains pending. MetaMask's harmful-site warning is unresolved. **Not ready for submission.**
 
@@ -140,4 +142,4 @@ Automatic discovery uses Arc native USDC Transfer events from `0xfffffffffffffff
 
 ## Vercel hosting comparison
 
-A Next.js entry point in [`vercel-app`](vercel-app/README.md) serves this same interface while retaining the existing invoice API and D1 database. It preserves existing payment requests and receipts. Vercel deployment is pending project-creation authorization; no Vercel URL or warning-free result is claimed.
+A Next.js entry point in [`vercel-app`](vercel-app/README.md) serves this same interface while retaining the existing invoice API and D1 database. It preserves existing payment requests and receipts. The Vercel deployment is live at https://arcpay-link-xi39.vercel.app. Its homepage and existing paid-receipt API returned HTTP 200; the receipt matches the real transaction, amount, sender, recipient and block recorded above. Wallet handoff and automatic PAID after a new transfer still require device testing. No warning-free result is claimed.
